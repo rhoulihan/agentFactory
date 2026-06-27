@@ -1,0 +1,24 @@
+# factory.example.yaml
+proxy:
+  host: 127.0.0.1
+  port: 8787
+  upstream_anthropic: https://api.anthropic.com
+  passthrough_models: ["claude-*"]
+
+backends:
+  local-nvidia:
+    engine: vllm
+    base_url: http://127.0.0.1:8000/v1
+    api_key: vllm
+  # remote-ubuntu:
+  #   engine: vllm
+  #   base_url: http://10.0.0.20:8000/v1
+  #   api_key: ${REMOTE_VLLM_KEY}
+
+models:
+  local/qwen3-coder:
+    backend: local-nvidia
+    model: Qwen/Qwen3-Coder-30B-A3B-Instruct
+    tool_parser: qwen3_coder
+    guided_decoding: true
+    context: 65536
