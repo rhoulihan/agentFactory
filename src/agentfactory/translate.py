@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 from .config import ModelConfig
 
@@ -109,3 +110,48 @@ def anthropic_to_openai_request(body: dict, mc: ModelConfig) -> dict:
         elif mc.guided_decoding:
             payload["tool_choice"] = "auto"
     return payload
+
+
+_STOP_MAP = {"tool_calls": "tool_use", "length": "max_tokens", "stop": "end_turn"}
+
+
+def map_stop_reason(finish_reason: str | None) -> str:
+    return _STOP_MAP.get(finish_reason or "", "end_turn")
+
+
+def openai_to_anthropic_response(resp: dict, requested_model: str) -> dict:
+    choice = resp["choices"][0]
+    message = choice.get("message", {})
+    content: list[dict] = []
+
+    text = message.get("content")
+    if text:
+        content.append({"type": "text", "text": text})
+
+    for call in message.get("tool_calls") or []:
+        fn = call.get("function", {})
+        try:
+            args = json.loads(fn.get("arguments") or "{}")
+        except json.JSONDecodeError:
+            args = {}
+        content.append({
+            "type": "tool_use",
+            "id": call.get("id") or f"toolu_{uuid.uuid4().hex[:24]}",
+            "name": fn.get("name", ""),
+            "input": args,
+        })
+
+    usage = resp.get("usage", {})
+    return {
+        "id": f"msg_{uuid.uuid4().hex[:24]}",
+        "type": "message",
+        "role": "assistant",
+        "model": requested_model,
+        "content": content,
+        "stop_reason": map_stop_reason(choice.get("finish_reason")),
+        "stop_sequence": None,
+        "usage": {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+        },
+    }
