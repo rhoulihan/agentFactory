@@ -48,6 +48,25 @@ def test_tools_mapped_and_tool_choice_defaulted():
     assert fn["parameters"]["properties"]["command"]["type"] == "string"
     assert out["tool_choice"] == "auto"
 
+def test_tool_choice_defaulted_even_without_guided_decoding():
+    """Guided-decoding constraint: tools present + no tool_choice always yields
+    tool_choice='auto', independent of the per-model guided_decoding flag."""
+    mc = ModelConfig(alias="local/x", backend="b", model="Qwen/X",
+                     guided_decoding=False)
+    body = {"messages": [{"role": "user", "content": "go"}],
+            "tools": [{"name": "bash", "description": "run",
+                       "input_schema": {"type": "object", "properties": {}}}]}
+    out = anthropic_to_openai_request(body, mc)
+    assert out["tool_choice"] == "auto"
+
+def test_tool_choice_none_mapped():
+    body = {"messages": [{"role": "user", "content": "go"}],
+            "tool_choice": {"type": "none"},
+            "tools": [{"name": "bash", "description": "run",
+                       "input_schema": {"type": "object", "properties": {}}}]}
+    out = anthropic_to_openai_request(body, MC)
+    assert out["tool_choice"] == "none"
+
 def test_stop_sequences_mapped():
     body = {"messages": [], "stop_sequences": ["STOP"]}
     out = anthropic_to_openai_request(body, MC)

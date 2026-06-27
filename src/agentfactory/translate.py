@@ -98,6 +98,9 @@ def anthropic_to_openai_request(body: dict, mc: ModelConfig) -> dict:
     tools = body.get("tools")
     if tools:
         payload["tools"] = _convert_tools(tools)
+        # Guided-decoding constraint: when tools are present on a local request the
+        # proxy must ALWAYS set tool_choice so vLLM engages its tool parser. This is
+        # independent of mc.guided_decoding.
         if "tool_choice" in body and isinstance(body["tool_choice"], dict):
             tc = body["tool_choice"]
             if tc.get("type") == "tool" and tc.get("name"):
@@ -105,9 +108,11 @@ def anthropic_to_openai_request(body: dict, mc: ModelConfig) -> dict:
                                           "function": {"name": tc["name"]}}
             elif tc.get("type") == "any":
                 payload["tool_choice"] = "required"
+            elif tc.get("type") == "none":
+                payload["tool_choice"] = "none"
             else:
                 payload["tool_choice"] = "auto"
-        elif mc.guided_decoding:
+        else:
             payload["tool_choice"] = "auto"
     return payload
 
