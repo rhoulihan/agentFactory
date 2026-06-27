@@ -12,6 +12,10 @@ agentFactory lets a Claude Code orchestrator running on a frontier Anthropic mod
 
 The whole system rests on one mechanism: a single **Anthropic-Messages-API-compatible routing proxy** sitting at `ANTHROPIC_BASE_URL` that dispatches each request **by its `model` field** — Claude model names pass through to `api.anthropic.com`, registered `local/*` aliases get translated and forwarded to a local inference backend. Because routing is keyed on the model name, a "local subagent" is nothing more than a normal `.claude/agents/*.md` file whose `model:` points at a local alias. No header-sniffing, no per-session env juggling, no fork of Claude Code.
 
+### Core invariant: local generates, Anthropic reviews
+
+**Local models are used *only* to generate code. Every review, verification, or judgment step runs on the parent Anthropic model — even when that step is delegated to a subagent.** A reviewer or adversarial-review subagent is an ordinary subagent whose `model:` is a Claude alias, so its requests take the passthrough path to `api.anthropic.com` automatically; it is never routed to a local backend. This keeps all quality gating at frontier capability while local models absorb only the grunt-work generation. The routing proxy enforces the split mechanically: `local/*` aliases are generation-only, and any subagent that reviews must carry a `claude-*` model.
+
 ### Goals
 
 - Launch local-model subagents **the exact same way** as any Anthropic subagent (native `Agent` dispatch, native UX).
@@ -211,10 +215,10 @@ The defining workflow. A local subagent's output is **isolated until the parent 
 1. **Dispatch in isolation.** The orchestrator launches a local subagent with worktree isolation (the `Agent` tool's `isolation: "worktree"`), so the subagent operates on an isolated copy of the repo on its own branch.
 2. **Generate + self-check.** The local model makes the edit and runs the relevant tests/build inside the worktree. It cannot touch the main tree.
 3. **Return a diff.** The subagent returns a unified diff + a short summary (what changed, test results).
-4. **Parent review.** The orchestrator (Opus) reviews the diff against the original spec — correctness, convention adherence, scope. This is where frontier judgment is spent.
+4. **Parent review (always Anthropic).** The diff is reviewed against the original spec — correctness, convention adherence, scope — by the parent Anthropic model. This is true whether the orchestrator (Opus) reviews inline or delegates to a reviewer subagent: per the core invariant, any review/adversarial-review subagent carries a `claude-*` model and takes the passthrough path. **Review is never performed by a local model.** This is where frontier judgment is spent.
 5. **Decide.** Merge (helper applies the worktree branch to the main tree), iterate (send specific feedback back to the same or a fresh local subagent), or discard (drop the worktree; nothing leaked).
 
-A small **merge helper** (`factory merge <worktree>` or an equivalent the orchestrator calls) encapsulates step 5's apply path and cleans up the worktree. Optional later: a dedicated Anthropic-backed **reviewer subagent** that audits each diff before the parent sees it (P3).
+A small **merge helper** (`factory merge <worktree>` or an equivalent the orchestrator calls) encapsulates step 5's apply path and cleans up the worktree. Optional later: a dedicated Anthropic-backed **reviewer subagent** (and adversarial-verification panel) that audits each diff before the parent accepts it (P3) — Anthropic-backed by construction.
 
 ---
 
@@ -269,7 +273,7 @@ Work:    Orchestrator (Opus) plans the task, decomposes into grunt-work units.
 **Phase 3 — Robustness & reach**
 - docker-compose stack for reproducible remote deploy.
 - LM Studio / MLX native-Anthropic endpoint path (zero-translation backend type) for Mac users.
-- Dedicated reviewer-subagent option.
+- Dedicated reviewer-subagent + adversarial-verification panel (Anthropic-backed by construction).
 - ReAct/XML fallback for weak-tool models.
 
 ---
