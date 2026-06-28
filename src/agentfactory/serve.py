@@ -38,6 +38,7 @@ def build_vllm_argv(mc: ModelConfig, backend: BackendConfig) -> list[str]:
         argv += ["--guided-decoding-backend", "xgrammar"]
     if mc.context:
         argv += ["--max-model-len", str(mc.context)]
+    argv += mc.extra_args
     return argv
 
 

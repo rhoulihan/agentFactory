@@ -80,3 +80,17 @@ def test_serve_missing_tool_parser_returns_one(capsys):
     rc = serve_vllm(cfg, "local/noparser", dry_run=True)
     assert rc == 1
     assert "tool_parser" in capsys.readouterr().out
+
+
+def test_build_vllm_argv_appends_extra_args():
+    mc = MC.model_copy(update={"extra_args": [
+        "--quantization", "awq", "--gpu-memory-utilization", "0.6"]})
+    argv = build_vllm_argv(mc, BACKEND)
+    # extra args are appended verbatim at the end, after the standard flags
+    assert argv[-4:] == [
+        "--quantization", "awq", "--gpu-memory-utilization", "0.6"]
+
+
+def test_build_vllm_argv_no_extra_args_by_default():
+    argv = build_vllm_argv(MC, BACKEND)
+    assert "--quantization" not in argv
