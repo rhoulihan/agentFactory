@@ -115,6 +115,9 @@ def install(config: str = DEFAULT_CONFIG, force: bool = False) -> None:
 @app.command()
 def serve(alias: str, config: str = DEFAULT_CONFIG, dry_run: bool = False) -> None:
     """Launch vLLM for a local model alias with the correct tool-calling flags."""
+    if not Path(config).exists():
+        typer.echo(f"config not found: {config} (copy factory.example.yaml or run factory install)")
+        raise typer.Exit(1)
     cfg = FactoryConfig.load(config)
     raise typer.Exit(serve_vllm(cfg, alias, dry_run=dry_run))
 

@@ -72,3 +72,11 @@ def test_serve_remote_backend_prints_not_launches(capsys):
 
 def test_serve_unknown_alias_returns_one():
     assert serve_vllm(_config(), "local/nope", dry_run=True) == 1
+
+
+def test_serve_missing_tool_parser_returns_one(capsys):
+    cfg = _config()
+    cfg.models["local/noparser"] = MC.model_copy(update={"tool_parser": None})
+    rc = serve_vllm(cfg, "local/noparser", dry_run=True)
+    assert rc == 1
+    assert "tool_parser" in capsys.readouterr().out

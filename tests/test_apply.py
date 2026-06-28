@@ -72,3 +72,35 @@ def test_non_git_dir_rejected(tmp_path):
     res = apply_diff("diff --git a/x b/x\n", cwd=tmp_path)
     assert res.ok is False
     assert "git" in res.message.lower()
+
+
+def test_real_diff_against_diverged_tree_is_rejected_clean(tmp_path):
+    repo = _make_repo(tmp_path)
+    (repo / "a.txt").write_text("hello patched\n")
+    patch = subprocess.run(["git", "--no-pager", "diff", "HEAD"], cwd=repo,
+                           capture_output=True, text=True).stdout
+    _git(["checkout", "--", "a.txt"], repo)
+    (repo / "a.txt").write_text("hello diverged\n")
+    _git(["add", "-A"], repo)
+    _git(["commit", "-q", "-m", "diverge"], repo)
+    res = apply_diff(patch, cwd=repo)
+    assert res.ok is False
+    content = (repo / "a.txt").read_text()
+    assert content == "hello diverged\n"
+    assert "<<<<<<<" not in content
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=repo,
+                            capture_output=True, text=True).stdout
+    assert status.strip() == ""
+
+
+def test_check_predicts_conflict_on_diverged_tree(tmp_path):
+    repo = _make_repo(tmp_path)
+    (repo / "a.txt").write_text("hello patched\n")
+    patch = subprocess.run(["git", "--no-pager", "diff", "HEAD"], cwd=repo,
+                           capture_output=True, text=True).stdout
+    _git(["checkout", "--", "a.txt"], repo)
+    (repo / "a.txt").write_text("hello diverged\n")
+    _git(["add", "-A"], repo)
+    _git(["commit", "-q", "-m", "diverge"], repo)
+    res = apply_diff(patch, check_only=True, cwd=repo)
+    assert res.ok is False

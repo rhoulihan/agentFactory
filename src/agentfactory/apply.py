@@ -41,9 +41,9 @@ def apply_diff(
         return ApplyResult(False, [], "not a git repository")
 
     files = _changed_files(diff_text, cwd)
-    args = ["git", "apply", "--3way"]
+    args = ["git", "apply"]
     if check_only:
-        args = ["git", "apply", "--check", "--3way"]
+        args = ["git", "apply", "--check"]
     proc = _run(args, cwd, stdin=diff_text)
     if proc.returncode != 0:
         return ApplyResult(False, files, proc.stderr.strip() or "apply failed")

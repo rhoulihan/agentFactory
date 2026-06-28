@@ -47,7 +47,11 @@ def serve_vllm(config: FactoryConfig, alias: str, dry_run: bool = False) -> int:
         print(f"unknown model alias: {alias}")
         return 1
     backend = config.backend_for(mc)
-    argv = build_vllm_argv(mc, backend)
+    try:
+        argv = build_vllm_argv(mc, backend)
+    except ValueError as exc:
+        print(str(exc))
+        return 1
     cmd = " ".join(argv)
 
     if dry_run or not is_local_host(backend.base_url):

@@ -132,3 +132,9 @@ def test_new_commands_registered():
     assert result.exit_code == 0
     for cmd in ("install", "serve", "apply", "up", "doctor"):
         assert cmd in result.stdout
+
+
+def test_serve_command_missing_config_exits_one(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["serve", "local/x"])
+    assert result.exit_code == 1
