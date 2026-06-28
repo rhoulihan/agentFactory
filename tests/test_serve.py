@@ -26,16 +26,15 @@ def test_build_vllm_argv_full():
         "vllm", "serve", "Qwen/Qwen3-Coder-30B-A3B-Instruct",
         "--host", "127.0.0.1", "--port", "8000",
         "--enable-auto-tool-choice", "--tool-call-parser", "qwen3_coder",
-        "--guided-decoding-backend", "xgrammar",
         "--max-model-len", "65536",
     ]
 
 
-def test_build_vllm_argv_no_guided_decoding_omits_flag():
-    mc = MC.model_copy(update={"guided_decoding": False})
-    argv = build_vllm_argv(mc, BACKEND)
-    assert "--guided-decoding-backend" not in argv
-    assert "--tool-call-parser" in argv
+def test_build_vllm_argv_never_emits_removed_guided_decoding_flag():
+    # vLLM 0.23 removed --guided-decoding-backend (xgrammar is the default
+    # structured-outputs backend); emitting it would crash `vllm serve`.
+    assert "--guided-decoding-backend" not in build_vllm_argv(MC, BACKEND)
+    assert "--tool-call-parser" in build_vllm_argv(MC, BACKEND)
 
 
 def test_build_vllm_argv_requires_tool_parser():

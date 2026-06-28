@@ -34,8 +34,10 @@ def build_vllm_argv(mc: ModelConfig, backend: BackendConfig) -> list[str]:
         "--enable-auto-tool-choice",
         "--tool-call-parser", mc.tool_parser,
     ]
-    if mc.guided_decoding:
-        argv += ["--guided-decoding-backend", "xgrammar"]
+    # NOTE: modern vLLM (>=0.23) has no --guided-decoding-backend flag; xgrammar
+    # is the default structured-outputs backend, so constrained tool-call
+    # decoding is already on. `guided_decoding` is kept in the registry as intent
+    # documentation. Force a specific backend via extra_args if ever needed.
     if mc.context:
         argv += ["--max-model-len", str(mc.context)]
     argv += mc.extra_args
