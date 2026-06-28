@@ -4,8 +4,9 @@ End-to-end walkthrough: a Claude Code orchestrator (Anthropic) dispatches the
 `local-coder` subagent, a local Qwen model generates a change in an isolated
 worktree, you review the diff, and `factory apply` lands it on the main tree.
 
-> Tested with vLLM (pin your version here after the first run) and
-> `Qwen/Qwen3-Coder-30B-A3B-Instruct` on a single NVIDIA GPU.
+> First verified with **vLLM 0.23.0** and **`Qwen/Qwen2.5-Coder-7B-Instruct-AWQ`**
+> on an RTX 4070 Ti SUPER (16 GB, WSL2, CUDA driver 591.86 / toolkit 12.0).
+> Choose the model to fit your VRAM — see [Troubleshooting](#troubleshooting).
 
 ## 1. Configure
 
@@ -16,12 +17,13 @@ cp factory.example.yaml factory.yaml      # edit model/alias for your GPU if nee
 ## 2. Launch the local model
 
 ```bash
-factory serve local/qwen3-coder           # runs vLLM on :8000 with the right
-                                          # --tool-call-parser + guided decoding
+factory serve local/qwen-coder            # runs vLLM on :8000 with the correct
+                                          # --tool-call-parser for the model
 ```
 
 Leave it running (use a second terminal, or background it). To preview the
-command without launching: `factory serve local/qwen3-coder --dry-run`.
+command without launching: `factory serve local/qwen-coder --dry-run`. On WSL or
+an older CUDA toolkit, see [Troubleshooting](#troubleshooting) first.
 
 ## 3. Start the proxy and verify
 
@@ -66,3 +68,33 @@ factory apply change.patch                # lands it on the main tree
 
 A conflicting or malformed diff is rejected and the tree is left clean — nothing
 the local model produced reaches main until you apply it.
+
+## Troubleshooting
+
+### vLLM crashes building a flashinfer kernel (`ninja` / `nvcc` errors)
+On a fresh or older-CUDA box (e.g. CUDA toolkit 12.0), vLLM's flashinfer backend
+JIT-compiles a sampling kernel at startup and fails with
+`FileNotFoundError: 'ninja'` or a CUB compile error
+(`... has no member "FlagHeads"`). Fix **without** upgrading CUDA by disabling
+flashinfer and using the precompiled FlashAttention backend + native sampler:
+
+```bash
+uv tool install ninja                      # only if you hit the 'ninja' error
+
+VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_ATTENTION_BACKEND=FLASH_ATTN \
+  factory serve local/qwen-coder --config factory.yaml
+```
+
+### Model sizing for your VRAM
+- **24 GB+** : Qwen2.5-Coder-32B / Qwen3-Coder-30B at 4-bit.
+- **16 GB**  : a 7B AWQ coder (e.g. `Qwen/Qwen2.5-Coder-7B-Instruct-AWQ`) with
+  `extra_args: ["--quantization", "awq", "--gpu-memory-utilization", "0.6"]`
+  and `context: 8192`. The 30B will OOM on 16 GB.
+- Lower `--gpu-memory-utilization` to leave headroom for other GPU users
+  (a desktop/WSL display already consumes a few GB).
+
+### `vllm serve` flag errors
+`factory serve` targets modern vLLM (>= 0.23): it emits `--enable-auto-tool-choice`,
+`--tool-call-parser`, `--max-model-len`, and your `extra_args`. It does **not**
+emit the removed `--guided-decoding-backend` (xgrammar is the default backend).
+Pass any version-specific flags via `extra_args` in `factory.yaml`.
