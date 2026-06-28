@@ -124,3 +124,11 @@ def test_apply_command_nonzero_on_failure(monkeypatch):
                         lambda text, check_only=False, cwd=None: ApplyResult(False, [], "empty diff"))
     result = runner.invoke(app, ["apply"], input="x")
     assert result.exit_code == 1
+
+
+# --- append to tests/test_cli.py ---
+def test_new_commands_registered():
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    for cmd in ("install", "serve", "apply", "up", "doctor"):
+        assert cmd in result.stdout
