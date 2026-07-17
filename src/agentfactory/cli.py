@@ -4,14 +4,18 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import sys
 from pathlib import Path
 
 import httpx
 import typer
 import uvicorn
 
+from .apply import apply_diff
 from .config import FactoryConfig
+from .install import install_project
 from .proxy import create_app
+from .serve import serve_vllm
 from .smoke import smoke_test_model
 
 app = typer.Typer(help="agentFactory control CLI")
@@ -97,3 +101,33 @@ def doctor(config: str = DEFAULT_CONFIG) -> None:
         all_ok = all_ok and passed
 
     raise typer.Exit(0 if all_ok else 1)
+
+
+@app.command()
+def install(config: str = DEFAULT_CONFIG, force: bool = False) -> None:
+    """Wire the current project to the proxy (idempotent)."""
+    cfg = FactoryConfig.load(config) if Path(config).exists() else FactoryConfig()
+    res = install_project(Path.cwd(), cfg, force=force)
+    for action in res.actions:
+        typer.echo(f"  {action}")
+
+
+@app.command()
+def serve(alias: str, config: str = DEFAULT_CONFIG, dry_run: bool = False) -> None:
+    """Launch vLLM for a local model alias with the correct tool-calling flags."""
+    if not Path(config).exists():
+        typer.echo(f"config not found: {config} (copy factory.example.yaml or run factory install)")
+        raise typer.Exit(1)
+    cfg = FactoryConfig.load(config)
+    raise typer.Exit(serve_vllm(cfg, alias, dry_run=dry_run))
+
+
+@app.command()
+def apply(diff: str = typer.Argument(None), check: bool = False) -> None:
+    """Apply a reviewed unified diff to the main tree (or --check to dry-run)."""
+    text = Path(diff).read_text() if diff else sys.stdin.read()
+    res = apply_diff(text, check_only=check)
+    for f in res.changed_files:
+        typer.echo(f"  {f}")
+    typer.echo(res.message)
+    raise typer.Exit(0 if res.ok else 1)

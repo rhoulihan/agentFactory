@@ -13,9 +13,15 @@ Carried forward from the Phase 1 build's whole-branch review (deferred, non-bloc
 - **`stream_upstream` (passthrough path) has no direct unit test.** Covered indirectly via the proxy passthrough test (which monkeypatches it), but the function itself is untested. Add a respx-backed unit test.
 - **CLI `up`/`down`/`status` have no direct tests** (only `_pid_path` and `doctor` are exercised). Add coverage when `up` gains the `install` flow.
 
+## From the first real run (2026-06-28, RTX 4070 Ti SUPER / WSL2 / CUDA 12.0)
+
+- **`factory serve` env passthrough.** This box needs `VLLM_USE_FLASHINFER_SAMPLER=0` and `VLLM_ATTENTION_BACKEND=FLASH_ATTN` (old CUDA toolkit can't JIT-build flashinfer). Today these are set by hand at launch; add an optional `env:` map to a backend/model in `factory.yaml` that `serve` exports before exec, so the workaround is declarative. (Documented in `docs/first-run.md` Troubleshooting.)
+- **AWQ marlin.** vLLM logs that `--quantization awq_marlin` is faster than `awq` on Ada; consider defaulting AWQ models to `awq_marlin` (or auto-detecting) once validated.
+- **`factory serve` could pre-flight ninja/nvcc.** Detect missing `ninja` / old `nvcc` and print the flashinfer-disable hint instead of letting vLLM crash deep in startup.
+
 ## Larger Phase 2 scope (from spec §7)
 
-- `factory install`, `factory models`, `factory report`.
-- Worktree merge helper.
+- `factory models`, `factory report` (`factory install` shipped in Phase 2a).
+- Worktree merge helper (`factory apply` shipped in Phase 2a).
 - Multiple local aliases; exercise the remote Ubuntu backend end-to-end.
 - Tool-call repair; observability + local-vs-Anthropic cost split.

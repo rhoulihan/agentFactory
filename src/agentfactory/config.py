@@ -21,6 +21,7 @@ class ModelConfig(BaseModel):
     tool_parser: str | None = None
     guided_decoding: bool = False
     context: int = 32768
+    extra_args: list[str] = Field(default_factory=list)
 
 
 class ProxyConfig(BaseModel):
